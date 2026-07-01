@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import {
   Menu,
-  Home as
   Plus,
   Check,
   ChevronDown,
@@ -77,29 +76,29 @@ function PieChart({ accepted, rejected, pending }) {
 function Card({ title, children, className = "" }) {
   return (
     <div
-      className={"relative overflow-hidden rounded-2xl border border-pink-200/70 shadow-[0_2px_8px_rgba(244,194,214,0.18)] " + className}
-      style={{ imageRendering: "pixelated" }}
+      className={
+        "relative overflow-hidden border-4 border-[#b87956] bg-[#ffe5b8] shadow-[6px_6px_0_rgba(99,62,45,0.18)] " +
+        className
+      }
+      style={{
+        imageRendering: "pixelated",
+        clipPath:
+          "polygon(0 10px, 10px 10px, 10px 0, calc(100% - 10px) 0, calc(100% - 10px) 10px, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 10px calc(100% - 10px), 0 calc(100% - 10px))",
+      }}
     >
-      {/* pink cloud bg — very faded */}
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage: "url(/backgrounds/pink-cloud.png)",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          opacity: 0.08,
-          imageRendering: "pixelated",
-        }}
-      />
-      {/* solid card fill over the cloud */}
-      <div className="absolute inset-0 bg-white/88" />
+      <div className="absolute inset-2 border-2 border-[#c58d64] opacity-70" />
+      <div className="absolute inset-4 border border-[#d9ad7c] opacity-60" />
 
-      {/* content */}
-      <div className="relative z-10 flex flex-col h-full p-4">
-        <div className="mb-3">
+      <span className="absolute left-3 top-3 h-3 w-3 border-l-2 border-t-2 border-[#a9684a]" />
+      <span className="absolute right-3 top-3 h-3 w-3 border-r-2 border-t-2 border-[#a9684a]" />
+      <span className="absolute bottom-3 left-3 h-3 w-3 border-b-2 border-l-2 border-[#a9684a]" />
+      <span className="absolute bottom-3 right-3 h-3 w-3 border-b-2 border-r-2 border-[#a9684a]" />
+
+      <div className="relative z-10 flex flex-col h-full p-6">
+        <div className="mb-3 border-b-2 border-[#d7a06f]/60 pb-2">
           <h3
             className="text-[13px] font-bold uppercase tracking-widest"
-            style={{ fontFamily: "'PixelAE', monospace", color: "#6b4f4f" }}
+            style={{ fontFamily: "'PixelAE', monospace", color: "#7a4a36" }}
           >
             {title}
           </h3>
@@ -343,7 +342,15 @@ export default function HomePage() {
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-7">
 
         {/* ── welcome hero ──────────────────────────────────── */}
-        <section className="relative mb-5 overflow-hidden rounded-2xl border-2 border-pink-200/80" style={{ minHeight: 220 }}>
+        <section
+        className="relative mb-5 overflow-hidden border-4 border-[#b87956] bg-[#ffe5b8] shadow-[6px_6px_0_rgba(99,62,45,0.18)]"
+        style={{
+          minHeight: 220,
+          imageRendering: "pixelated",
+          clipPath:
+          "polygon(0 10px, 10px 10px, 10px 0, calc(100% - 10px) 0, calc(100% - 10px) 10px, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 10px calc(100% - 10px), 0 calc(100% - 10px))",
+  }}
+>
 
           {/* welcome background */}
           <div
@@ -352,11 +359,17 @@ export default function HomePage() {
               backgroundImage: "url(/backgrounds/pink-cloud.png)",
               backgroundSize: "cover",
               backgroundPosition: "center",
-              opacity: 0.8,
+              opacity: 0.95,
               imageRendering: "pixelated",
             }}
           />
-          <div className="absolute inset-0 bg-[#fff7fa]/70" />
+          <div className="absolute inset-0 bg-[#ffe5b8]/35" />
+          <div className="absolute inset-2 border-2 border-[#c58d64] opacity-70" />
+          <div className="absolute inset-4 border border-[#d9ad7c] opacity-60" />
+          <span className="absolute left-3 top-3 h-3 w-3 border-l-2 border-t-2 border-[#a9684a]" />
+          <span className="absolute right-3 top-3 h-3 w-3 border-r-2 border-t-2 border-[#a9684a]" />
+          <span className="absolute bottom-3 left-3 h-3 w-3 border-b-2 border-l-2 border-[#a9684a]" />
+          <span className="absolute bottom-3 right-3 h-3 w-3 border-b-2 border-r-2 border-[#a9684a]" />
 
           {/* soft scrims */}
           <div className="absolute inset-y-0 left-0 w-2/5 bg-linear-to-r from-[#fffafc]/85 to-transparent" />
