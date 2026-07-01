@@ -9,6 +9,14 @@ import {
   ChevronDown,
   AlertTriangle,
   ExternalLink,
+  X,
+  Home,
+  CreditCard,
+  BookOpen,
+  GraduationCap,
+  Briefcase,
+  User,
+  FolderOpen,
 } from "lucide-react";
 
 /* ─── pixel emoji paths ───────────────────────────────────────── */
@@ -109,6 +117,80 @@ function Card({ title, children, className = "" }) {
   );
 }
 
+/* ─── side menu with card styling ───────────────────────────────── */
+function SideMenu({ isOpen, onClose }) {
+  const menuItems = [
+    { label: "Home" },
+    { label: "Calendar" },
+    { label: "Agenda" },
+    { label: "Academics" },
+    { label: "Goals" },
+    { label: "Opportunities" },
+    { label: "Budget" },
+    { label: "Self Care" },
+    { label: "Resources" },
+  ];
+
+  return (
+    <>
+      {/* Overlay */}
+      <div
+        className={"fixed inset-0 bg-black/30 z-40 transition-opacity duration-300 " + (isOpen ? "opacity-100" : "opacity-0 pointer-events-none")}
+        onClick={onClose}
+      />
+
+      {/* Side Menu */}
+      <div
+        className={"fixed left-0 top-0 h-full w-72 z-50 overflow-hidden border-4 border-[#b87956] bg-[#ffe5b8] shadow-[6px_6px_0_rgba(99,62,45,0.18)] transition-transform duration-300 " + (isOpen ? "translate-x-0" : "-translate-x-full")}
+        style={{
+          imageRendering: "pixelated",
+          clipPath:
+            "polygon(0 10px, 10px 10px, 10px 0, calc(100% - 10px) 0, calc(100% - 10px) 10px, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 10px calc(100% - 10px), 0 calc(100% - 10px))",
+        }}
+      >
+        <div className="absolute inset-2 border-2 border-[#c58d64] opacity-70" />
+        <div className="absolute inset-4 border border-[#d9ad7c] opacity-60" />
+
+        <span className="absolute left-3 top-3 h-3 w-3 border-l-2 border-t-2 border-[#a9684a]" />
+        <span className="absolute right-3 top-3 h-3 w-3 border-r-2 border-t-2 border-[#a9684a]" />
+        <span className="absolute bottom-3 left-3 h-3 w-3 border-b-2 border-l-2 border-[#a9684a]" />
+        <span className="absolute bottom-3 right-3 h-3 w-3 border-b-2 border-r-2 border-[#a9684a]" />
+
+        <div className="relative z-10 flex flex-col h-full p-6">
+          {/* Header with close button */}
+          <div className="flex items-center justify-between mb-6 border-b-2 border-[#d7a06f]/60 pb-3">
+            <h3
+              className="text-[13px] font-bold uppercase tracking-widest"
+              style={{ fontFamily: "'PixelAE', monospace", color: "#7a4a36" }}
+            >
+              MENU
+            </h3>
+            <button
+              onClick={onClose}
+              className="rounded p-1 text-[#7a4a36] hover:bg-[#d7a06f]/30 transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Menu Items */}
+          <nav className="flex flex-col gap-1 flex-1 overflow-y-auto">
+            {menuItems.map((item, index) => (
+              <button
+                key={index}
+                className="rounded px-3 py-2.5 text-left text-[12px] font-bold text-stone-700 hover:bg-[#d7a06f]/40 transition-colors"
+                style={{ fontFamily: "'PixelAE', monospace" }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </div>
+    </>
+  );
+}
+
 /* ─── pixel checklist ─────────────────────────────────────────── */
 function Checklist({ items, setItems, accentBg, limit = 6 }) {
   const toggle = (idx) =>
@@ -195,6 +277,7 @@ export default function HomePage() {
     { label: "Resources" },
   ];
   const [activeNav, setActiveNav] = useState("Home");
+  const [sideMenuOpen, setSideMenuOpen] = useState(false);
 
   /* welcome data */
   const assignmentsDue = 2;
@@ -314,7 +397,11 @@ export default function HomePage() {
       <header className="border-b-2 border-pink-200 bg-[#fffafc]/95 backdrop-blur-sm">
         <div className="flex items-center justify-between gap-4 px-5 py-2.5 sm:px-8">
           <div className="flex items-center gap-3">
-            <button aria-label="Menu" className="rounded p-1 text-pink-700 hover:bg-pink-100">
+            <button
+              aria-label="Menu"
+              onClick={() => setSideMenuOpen(true)}
+              className="rounded p-1 text-pink-700 hover:bg-pink-100"
+            >
               <Menu size={20} />
             </button>
             <span
@@ -338,6 +425,9 @@ export default function HomePage() {
           </p>
         </div>
       </header>
+
+      {/* Side Menu */}
+      <SideMenu isOpen={sideMenuOpen} onClose={() => setSideMenuOpen(false)} />
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-7">
 
