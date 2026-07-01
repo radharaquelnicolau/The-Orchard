@@ -1,41 +1,46 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+
+import React, { useEffect, useState } from "react";
+import Image from "next/image";
 import {
   Menu,
   Home as HomeIcon,
-  ListChecks,
   CalendarDays,
   Calendar,
-  Timer,
   GraduationCap,
+  Target,
+  Briefcase,
   Wallet,
-  Play,
-  Pause,
-  RotateCcw,
+  Heart,
+  Layers,
+  Plus,
   Check,
   ChevronDown,
   AlertTriangle,
-  Angry,
-  Frown,
-  Meh,
-  Smile,
-  Laugh,
+  ExternalLink,
 } from "lucide-react";
 
-// Real pixel-art tree sprites (cropped from the Resurrected RPG asset pack).
-// Each palette has 3 growth stages: stage1 (tiny shrub) -> stage2 (sapling) -> stage3 (mature tree).
-const TREE_PALETTES = ["spring", "autumn-gold", "deep-green", "autumn-red", "olive"];
-const treeSprite = (palette, stage) => `/sprites/trees/tree-${palette}-stage${stage}.png`;
+/* ─── pixel emoji paths ───────────────────────────────────────── */
+const MOODS = [
+  { src: "/sprites/emotes/tired.png",  label: "Rough" },
+  { src: "/sprites/emotes/frown.png",  label: "Low"   },
+  { src: "/sprites/emotes/sad.png",    label: "Meh"   },
+  { src: "/sprites/emotes/smile.png",  label: "Good"  },
+  { src: "/sprites/emotes/happy.png",  label: "Great" },
+];
 
-const FONT_DISPLAY = "'Fraunces', Georgia, serif";
-const FONT_MONO = "'IBM Plex Mono', monospace";
-
+/* ─── helpers ─────────────────────────────────────────────────── */
 function useClock() {
-  const [now, setNow] = useState(new Date());
+  const [now, setNow] = useState(() => new Date());
+
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
+    const tick = () => setNow(new Date());
+    tick();
+
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
   }, []);
+
   return now;
 }
 
@@ -47,339 +52,368 @@ function getWeekNumber(date) {
   return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 
-function Card({ title, icon, accent, children, className = "" }) {
+/* ─── tiny pie chart (SVG) for rejection tracker ─────────────── */
+function PieChart({ accepted, rejected, pending }) {
+  const total = accepted + rejected + pending || 1;
+  const slices = [
+    { value: accepted, color: "#86efac" },
+    { value: rejected, color: "#fca5a5" },
+    { value: pending,  color: "#fcd34d" },
+  ];
+  let cumAngle = -Math.PI / 2;
+  const R = 38, cx = 44, cy = 44;
+  const paths = slices.map(({ value, color }) => {
+    const angle = (value / total) * 2 * Math.PI;
+    const x1 = cx + R * Math.cos(cumAngle);
+    const y1 = cy + R * Math.sin(cumAngle);
+    cumAngle += angle;
+    const x2 = cx + R * Math.cos(cumAngle);
+    const y2 = cy + R * Math.sin(cumAngle);
+    const large = angle > Math.PI ? 1 : 0;
+    return { d: `M${cx},${cy} L${x1},${y1} A${R},${R},0,${large},1,${x2},${y2} Z`, color };
+  });
+  return (
+    <svg viewBox="0 0 88 88" width={88} height={88} style={{ imageRendering: "pixelated" }}>
+      {paths.map((p, i) => (
+        <path key={i} d={p.d} fill={p.color} stroke="#fff" strokeWidth="1.5" />
+      ))}
+    </svg>
+  );
+}
+
+/* ─── shared card shell ───────────────────────────────────────── */
+function Card({ title, accentBg, children, className = "" }) {
   return (
     <div
-      className={
-        "rounded-3xl border border-stone-200 bg-white/80 p-5 shadow-sm backdrop-blur-sm " +
-        "transition-transform duration-200 hover:-translate-y-1 hover:shadow-md " +
-        "motion-reduce:transition-none motion-reduce:hover:translate-y-0 " +
-        className
-      }
+      className={"relative overflow-hidden rounded-2xl border border-pink-200/70 shadow-[0_2px_8px_rgba(244,194,214,0.18)] " + className}
+      style={{ imageRendering: "pixelated" }}
     >
-      <div className="mb-3 flex items-center gap-2">
-        <span className={"flex h-8 w-8 items-center justify-center rounded-full " + accent}>
-          {icon}
-        </span>
-        <h3
-          className="text-[15px] font-semibold text-stone-800 tracking-wide"
-          style={{ fontFamily: FONT_DISPLAY }}
-        >
-          {title}
-        </h3>
+      {/* pink cloud bg — very faded */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: "url(/backgrounds/pink-cloud.png)",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          opacity: 0.08,
+          imageRendering: "pixelated",
+        }}
+      />
+      {/* solid card fill over the cloud */}
+      <div className="absolute inset-0 bg-white/88" />
+
+      {/* content */}
+      <div className="relative z-10 flex flex-col h-full p-4">
+        <div className="mb-3">
+          <h3
+            className="text-[13px] font-bold uppercase tracking-widest"
+            style={{ fontFamily: "'PixelAE', monospace", color: "#6b4f4f" }}
+          >
+            {title}
+          </h3>
+        </div>
+        <div className="flex-1 overflow-hidden">{children}</div>
       </div>
-      {children}
     </div>
   );
 }
 
-function Checklist({ items, setItems, doneColor }) {
+/* ─── pixel checklist ─────────────────────────────────────────── */
+function Checklist({ items, setItems, accentBg, limit = 6 }) {
   const toggle = (idx) =>
     setItems((prev) =>
       prev.map((it, i) => (i === idx ? { ...it, done: !it.done } : it))
     );
+  const [newLabel, setNewLabel] = useState("");
+  const add = () => {
+    if (!newLabel.trim()) return;
+    setItems((prev) => [...prev, { label: newLabel.trim(), done: false }]);
+    setNewLabel("");
+  };
   return (
-    <ul className="space-y-2">
-      {items.map((it, idx) => (
-        <li key={idx}>
-          <button
-            onClick={() => toggle(idx)}
-            className="group flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1 text-left
-                       focus-visible:outline-2 focus-visible:outline-offset-2
-                       focus-visible:outline-emerald-600"
-          >
-            <span
-              className={
-                "flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-md border " +
-                (it.done
-                  ? doneColor + " border-transparent"
-                  : "border-stone-300 bg-white group-hover:border-stone-400")
-              }
+    <div className="flex flex-col gap-1.5">
+      <ul className="space-y-1 overflow-y-auto" style={{ maxHeight: 130 }}>
+        {items.slice(0, limit).map((it, idx) => (
+          <li key={idx}>
+            <button
+              onClick={() => toggle(idx)}
+              className="group flex w-full items-center gap-2 rounded px-1 py-0.5 text-left hover:bg-stone-100/60"
             >
-              {it.done && <Check size={11} className="text-white" strokeWidth={3} />}
-            </span>
-            <span
-              className={
-                "text-[13.5px] leading-snug " +
-                (it.done ? "text-stone-400 line-through" : "text-stone-700")
-              }
-            >
-              {it.label}
-            </span>
-          </button>
-        </li>
-      ))}
-    </ul>
+              <span
+                className={
+                  "flex h-3.5 w-3.5 shrink-0 items-center justify-center border-2 " +
+                  (it.done ? accentBg + " border-transparent" : "border-stone-400 bg-white")
+                }
+                style={{ imageRendering: "pixelated" }}
+              >
+                {it.done && <Check size={9} className="text-white" strokeWidth={3} />}
+              </span>
+              <span
+                className={"text-[12px] leading-tight " + (it.done ? "line-through text-stone-400" : "text-stone-700")}
+                style={{ fontFamily: "'PixelAE', monospace" }}
+              >
+                {it.label}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-1 flex items-center gap-1">
+        <input
+          value={newLabel}
+          onChange={(e) => setNewLabel(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+          placeholder="Add item..."
+          className="flex-1 rounded border border-stone-200 bg-stone-50 px-2 py-0.5 text-[11px] text-stone-700 placeholder:text-stone-400 focus:outline-none focus:border-stone-400"
+          style={{ fontFamily: "'PixelAE', monospace" }}
+        />
+        <button
+          onClick={add}
+          className={"flex h-5 w-5 items-center justify-center rounded " + accentBg}
+        >
+          <Plus size={11} className="text-white" />
+        </button>
+      </div>
+    </div>
   );
 }
 
+/* ══════════════════════════════════════════════════════════════ */
 export default function HomePage() {
   const now = useClock();
-  const dayDate = now.toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-  const time = now.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  const weekNum = getWeekNumber(now);
-  const tempC = 22; // placeholder — would come from a weather API
 
+  const dayDate = now.toLocaleDateString(undefined, {
+    weekday: "long", month: "long", day: "numeric", year: "numeric",
+  });
+  const timeStr = now.toLocaleTimeString(undefined, {
+    hour: "numeric", minute: "2-digit",
+  });
+  const weekNum  = getWeekNumber(now);
+  const tempC    = 22;
+
+  /* nav */
   const navItems = [
-    { label: "Home", icon: HomeIcon },
-    { label: "Calendar", icon: Calendar },
-    { label: "Agenda", icon: CalendarDays },
-    { label: "Academics", icon: GraduationCap },
-    { label: "Budget", icon: Wallet },
-    { label: "Self-care", icon: Smile },
+    { label: "Home" },
+    { label: "Calendar" },
+    { label: "Agenda" },
+    { label: "Academics" },
+    { label: "Goals" },
+    { label: "Opportunities" },
+    { label: "Budget" },
+    { label: "Self Care" },
+    { label: "Resources" },
   ];
   const [activeNav, setActiveNav] = useState("Home");
 
+  /* welcome data */
+  const assignmentsDue = 2;
+  const eventsCount    = 2;
+  const overdueCount   = 1;
   const [weekOpen, setWeekOpen] = useState(true);
-  const assignmentsDue = 3;
-  const eventsToAttend = 2;
-  const overdueCount = 1;
   const weeklyItems = [
-    { label: "Calc II problem set 7", when: "Due Wed" },
-    { label: "Bio 201 lab report", when: "Due Fri" },
-    { label: "Dentist appointment", when: "Thu · 2:00 PM" },
-    { label: "Scholarship essay draft", when: "Due Sun" },
+    { label: "Calculus assignment", when: "30/06 · 13:00" },
+    { label: "History Essay",       when: "31/06 · 00:00" },
+    { label: "Scholarship Essay",   when: "31/06 · 00:00" },
+    { label: "Meeting w/ Coordinator", when: "31/06 · 14:00" },
+    { label: "Stacy's bday",        when: "· 14:00"        },
   ];
 
-  const agendaItems = [
-    { label: "Bio 201 lab report", when: "Fri" },
-    { label: "Project proposal", when: "Mon" },
-    { label: "Dentist · 2:00 PM", when: "Thu" },
-  ];
-
-  const [todoItems, setTodoItems] = useState([
-    { label: "Email professor re: extension", done: false },
-    { label: "Laundry", done: true },
-    { label: "Gym — leg day", done: false },
-    { label: "Grocery run", done: false },
-  ]);
-
-  const moods = [
-    { Icon: Angry, label: "Awful" },
-    { Icon: Frown, label: "Bad" },
-    { Icon: Meh, label: "Okay" },
-    { Icon: Smile, label: "Good" },
-    { Icon: Laugh, label: "Great" },
-  ];
-  const [selectedMood, setSelectedMood] = useState(3);
-  const [selfCareItems, setSelfCareItems] = useState([
-    { label: "10 min stretch", done: true },
-    { label: "Drink 64oz water", done: false },
-    { label: "Journal before bed", done: false },
-  ]);
-
-  const grades = [
-    { subj: "CALC II", grade: "A-" },
-    { subj: "BIO 201", grade: "B+" },
-    { subj: "CHEM 110", grade: "B" },
-    { subj: "ENG 220", grade: "A" },
-    { subj: "HIST 150", grade: "A-" },
-    { subj: "SPAN 102", grade: "B+" },
-    { subj: "ART 101", grade: "A" },
-    { subj: "PSYC 100", grade: "B+" },
-  ];
-
-  const budget = {
-    periodLabel: "Until next paycheck · Jul 11",
-    spent: 346.2,
-    allowance: 300,
-    saved: 612.0,
+  /* daily verse */
+  const verse = {
+    text: "Be joyful in hope, patient in affliction, faithful in prayer.",
+    ref:  "Romans 12:12",
   };
+
+  /* ── card state ─────────────────────────────────── */
+
+  /* weekly goals */
+  const [goals, setGoals] = useState([
+    { label: "Finish scholarship essay", done: false },
+    { label: "Read chapter 4 Calc",      done: true  },
+    { label: "Prep for advisor meeting", done: false },
+  ]);
+
+  /* daily to-do */
+  const [todos, setTodos] = useState([
+    { label: "Email professor re: extension", done: false },
+    { label: "Laundry",                       done: true  },
+    { label: "Gym — leg day",                 done: false },
+    { label: "Grocery run",                   done: false },
+  ]);
+
+  /* self care */
+  const [selfCare, setSelfCare] = useState([
+    { label: "10 min stretch",    done: true  },
+    { label: "Drink 64oz water",  done: false },
+    { label: "Journal",           done: false },
+  ]);
+  const [selectedMood, setSelectedMood] = useState(3);
+
+  /* grades */
+  const grades = [
+    { subj: "CALC II", grade: "A-", pct: 91 },
+    { subj: "BIO 201", grade: "B+", pct: 88 },
+    { subj: "CHEM 110",grade: "B",  pct: 83 },
+    { subj: "ENG 220", grade: "A",  pct: 95 },
+    { subj: "HIST 150",grade: "A-", pct: 91 },
+    { subj: "SPAN 102",grade: "B+", pct: 87 },
+  ];
+
+  /* budget */
+  const budget = { periodLabel: "Until next paycheck · Jul 11", spent: 346.2, allowance: 300, saved: 612 };
   const overBudget = budget.spent > budget.allowance;
-  const spendable = budget.allowance - budget.spent;
-  const expenses = [
-    { label: "Groceries", amount: 42.1 },
-    { label: "Textbook rental", amount: 68.0 },
-    { label: "Coffee runs", amount: 21.75 },
+  const spendable  = budget.allowance - budget.spent;
+  const expenses   = [
+    { label: "Groceries",      amount: 42.10 },
+    { label: "Textbook",       amount: 68.00 },
+    { label: "Coffee",         amount: 21.75 },
   ];
 
-  // Focus timer
-  const TOTAL = 25 * 60;
-  const [remaining, setRemaining] = useState(TOTAL);
-  const [running, setRunning] = useState(false);
-  const intervalRef = useRef(null);
+  /* opportunities */
+  const [apps] = useState([
+    { name: "Google STEP", status: "rejected" },
+    { name: "Meta University", status: "pending" },
+    { name: "UST Research Grant", status: "accepted" },
+    { name: "NSF REU", status: "rejected" },
+    { name: "Target Fellowship", status: "pending" },
+  ]);
+  const accepted = apps.filter(a => a.status === "accepted").length;
+  const rejected = apps.filter(a => a.status === "rejected").length;
+  const pending  = apps.filter(a => a.status === "pending").length;
+  const goalAcceptances = 3;
 
-  // A new plant species (palette) is picked each time a fresh session starts —
-  // this is what gives "mixed, different palette per session" growth.
-  const [sessionPalette, setSessionPalette] = useState(
-    () => TREE_PALETTES[Math.floor(Math.random() * TREE_PALETTES.length)]
-  );
-
-  useEffect(() => {
-    if (running && remaining > 0) {
-      intervalRef.current = setInterval(() => {
-        setRemaining((r) => {
-          if (r <= 1) {
-            setRunning(false);
-            return 0;
-          }
-          return r - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(intervalRef.current);
-  }, [running, remaining]);
-
-  const elapsedFrac = 1 - remaining / TOTAL;
-  const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
-  const ss = String(remaining % 60).padStart(2, "0");
-  const radius = 54;
-  const circumference = 2 * Math.PI * radius;
-  const dashoffset = circumference * (1 - elapsedFrac);
-
-  const growthStage = elapsedFrac < 0.34 ? 1 : elapsedFrac < 0.7 ? 2 : 3;
-  const growthSprite = treeSprite(sessionPalette, growthStage);
-
-  const gardenTiles = [
-    { x: 8, y: 62, w: 34, op: 0.4, palette: "olive", stage: 2 },
-    { x: 18, y: 42, w: 30, op: 0.45, palette: "spring", stage: 1 },
-    { x: 29, y: 64, w: 56, op: 0.65, palette: "deep-green", stage: 3 },
-    { x: 39, y: 38, w: 26, op: 0.7, palette: "autumn-gold", stage: 1 },
-    { x: 50, y: 58, w: 66, op: 0.95, palette: "spring", stage: 3 },
-    { x: 50, y: 30, w: 50, op: 0.9, palette: "autumn-red", stage: 3 },
-    { x: 61, y: 60, w: 60, op: 0.9, palette: "deep-green", stage: 3 },
-    { x: 71, y: 40, w: 28, op: 0.65, palette: "olive", stage: 1 },
-    { x: 82, y: 64, w: 38, op: 0.5, palette: "autumn-gold", stage: 2 },
-    { x: 92, y: 44, w: 28, op: 0.4, palette: "spring", stage: 1 },
+  /* resources */
+  const resources = [
+    { label: "Canvas",   url: "https://stthomas.instructure.com", cat: "Courses"  },
+    { label: "Murphy",   url: "https://murphy.stthomas.edu",      cat: "Courses"  },
+    { label: "UST Wellness", url: "#",                            cat: "Wellness" },
+    { label: "Tutoring Center", url: "#",                         cat: "Wellness" },
+    { label: "Library",  url: "#",                                cat: "Murphy"   },
   ];
 
+  /* weekly agenda */
+  const agendaItems = [
+    { label: "Bio 201 lab report",   when: "Fri" },
+    { label: "Project proposal",     when: "Mon" },
+    { label: "Dentist · 2:00 PM",   when: "Thu" },
+    { label: "History essay due",    when: "Fri" },
+    { label: "SPAN vocab quiz",      when: "Wed" },
+  ];
+
+  /* ══════════════════════════════════════════════════════════════ */
   return (
-    <div className="min-h-screen w-full bg-stone-50">
+    <div className="min-h-screen bg-[#fdf7fa]">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
-        * { font-family: 'Plus Jakarta Sans', sans-serif; }
+        @font-face {
+          font-family: 'PixelAE';
+          src: url('/fonts/PixelAE-Regular.ttf') format('truetype');
+          font-weight: 400;
+        }
+        @font-face {
+          font-family: 'PixelAE';
+          src: url('/fonts/PixelAE-Bold.ttf') format('truetype');
+          font-weight: 700;
+        }
+        * { image-rendering: pixelated; }
+        /* except regular text nodes */
+        p, span, h1, h2, h3, h4, button, input, textarea, li { image-rendering: auto; }
       `}</style>
 
-      {/* Top bar */}
-      <header className="border-b border-stone-200 bg-stone-50/90 backdrop-blur-sm">
-        <div className="flex items-center justify-between gap-4 px-5 py-3 sm:px-8">
+      {/* ── top bar ─────────────────────────────────────────── */}
+      <header className="border-b-2 border-pink-200 bg-[#fffafc]/95 backdrop-blur-sm">
+        <div className="flex items-center justify-between gap-4 px-5 py-2.5 sm:px-8">
           <div className="flex items-center gap-3">
-            <button
-              aria-label="Open menu"
-              className="rounded-lg p-1.5 text-stone-600 hover:bg-stone-200/70 focus-visible:outline-2 focus-visible:outline-emerald-600"
-            >
+            <button aria-label="Menu" className="rounded p-1 text-pink-700 hover:bg-pink-100">
               <Menu size={20} />
             </button>
             <span
-              className="text-[15px] font-semibold tracking-widest text-emerald-800"
-              style={{ fontFamily: FONT_DISPLAY }}
+              className="text-[17px] font-bold tracking-widest text-pink-700"
+              style={{ fontFamily: "'PixelAE', monospace" }}
             >
-              sprout
+              THE ORCHARD
             </span>
           </div>
-          <p className="flex-1 text-center text-[13px] text-stone-500 sm:text-sm">{dayDate}</p>
           <p
-            className="text-right text-[13px] font-medium text-stone-700 sm:text-sm"
-            style={{ fontFamily: FONT_MONO }}
+            className="flex-1 text-center text-[12px] text-pink-600"
+            style={{ fontFamily: "'PixelAE', monospace" }}
           >
-            {time} · {tempC}°C
+            {dayDate}
+          </p>
+          <p
+            className="text-right text-[12px] font-bold text-pink-700"
+            style={{ fontFamily: "'PixelAE', monospace" }}
+          >
+            {timeStr} · {tempC}°C
           </p>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-5 py-7 sm:px-8">
-        {/* Welcome hero — unboxed, top-down garden as background */}
-        <section className="relative mb-6 overflow-hidden rounded-3xl">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-7">
+
+        {/* ── welcome hero ──────────────────────────────────── */}
+        <section className="relative mb-5 overflow-hidden rounded-2xl border-2 border-pink-200/80" style={{ minHeight: 220 }}>
+
+          {/* welcome background */}
           <div
             className="absolute inset-0"
             style={{
-              background:
-                "linear-gradient(to bottom, #eaf3e6 0%, #d9e8d0 35%, #c4dab9 100%)",
+              backgroundImage: "url(/backgrounds/pink-cloud.png)",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              opacity: 0.8,
+              imageRendering: "pixelated",
             }}
-          >
-            <div className="absolute inset-0">
-              {[...gardenTiles]
-                .sort((a, b) => a.y - b.y)
-                .map((t, i) => (
-                  <img
-                    key={i}
-                    src={treeSprite(t.palette, t.stage)}
-                    alt=""
-                    style={{
-                      position: "absolute",
-                      left: `${t.x}%`,
-                      top: `${t.y}%`,
-                      width: t.w,
-                      height: "auto",
-                      opacity: t.op,
-                      transform: "translate(-50%, -90%)",
-                      zIndex: Math.round(t.y * 10),
-                      imageRendering: "pixelated",
-                    }}
-                    className="drop-shadow-sm"
-                  />
-                ))}
-            </div>
-            {/* legibility scrims so the art can bleed across columns without burying the text */}
-            <div className="absolute inset-y-0 left-0 w-1/2 bg-linear-to-r from-stone-50/95 via-stone-50/45 to-transparent" />
-            <div className="absolute inset-y-0 right-0 w-1/2 bg-linear-to-l from-stone-50/95 via-stone-50/45 to-transparent" />
-          </div>
+          />
+          <div className="absolute inset-0 bg-[#fff7fa]/70" />
 
-          <div className="relative z-10 grid grid-cols-1 gap-6 px-6 py-7 sm:px-8 md:grid-cols-3 md:gap-4">
-            {/* Left column: greeting + this week's stats */}
-            <div>
-              <h1
-                className="text-2xl font-medium text-emerald-950 sm:text-3xl"
-                style={{ fontFamily: FONT_DISPLAY }}
-              >
-                Welcome, Radha
+          {/* soft scrims */}
+          <div className="absolute inset-y-0 left-0 w-2/5 bg-linear-to-r from-[#fffafc]/85 to-transparent" />
+          <div className="absolute inset-y-0 right-0 w-2/5 bg-linear-to-l from-[#fffafc]/85 to-transparent" />
+
+          {/* three-column layout */}
+          <div className="relative z-10 grid grid-cols-1 gap-6 px-6 py-6 sm:px-8 md:grid-cols-3 md:gap-4">
+
+            {/* left — greeting + verse + stats */}
+            <div className="flex flex-col gap-2">
+              <h1 className="text-xl font-bold leading-tight text-stone-900 sm:text-2xl" style={{ fontFamily: "'PixelAE', monospace" }}>
+                WELCOME,<br />RADHA RAQUEL
               </h1>
-              <div className="mt-2 flex flex-col gap-0.5 text-[13.5px] text-emerald-900/85">
-                <span>
-                  <span style={{ fontFamily: FONT_MONO }}>{assignmentsDue}</span> assignments due
+              <p className="mt-1 text-[11px] text-stone-600 leading-snug" style={{ fontFamily: "'PixelAE', monospace" }}>
+                “{verse.text}”
+                <span className="ml-1 font-bold text-pink-700">
+                  — {verse.ref}
                 </span>
-                <span>
-                  <span style={{ fontFamily: FONT_MONO }}>{eventsToAttend}</span> events to attend
-                </span>
+              </p>
+              <div className="mt-2 flex flex-col gap-0.5 text-[12px]" style={{ fontFamily: "'PixelAE', monospace" }}>
+                <span className="text-stone-700">{assignmentsDue} assignments due</span>
+                <span className="text-stone-700">{eventsCount} events to attend</span>
                 {overdueCount > 0 && (
-                  <span className="font-medium text-rose-700">
-                    <span style={{ fontFamily: FONT_MONO }}>{overdueCount}</span> overdue
-                  </span>
+                  <span className="font-bold text-rose-600">{overdueCount} overdue</span>
                 )}
               </div>
             </div>
 
-            {/* Middle column: the garden art lives in the background here; column stays clear */}
-            <div className="hidden items-end justify-center pb-1 md:flex">
-              <p className="rounded-full bg-stone-50/70 px-3 py-1 text-[11px] text-emerald-800/70 backdrop-blur-sm">
-                Grown through your focus sessions
-              </p>
-            </div>
+            <div className="hidden md:block" />
 
-            {/* Right column: week number + this week's activities */}
+            {/* right — week + activity list */}
             <div>
-              <p className="text-[12px] text-stone-400 sm:text-[13px]" style={{ fontFamily: FONT_MONO }}>
-                Week {weekNum} of {now.getFullYear()}
+              <p className="text-[11px] font-bold text-stone-500" style={{ fontFamily: "'PixelAE', monospace" }}>
+                Week {weekNum} of {now.getFullYear()} · {timeStr}
               </p>
               <button
-                onClick={() => setWeekOpen((v) => !v)}
-                className="mt-1 flex items-center gap-1.5 text-[13px] font-medium text-emerald-800/90 hover:text-emerald-900 focus-visible:outline-2 focus-visible:outline-emerald-600 rounded"
+                onClick={() => setWeekOpen(v => !v)}
+                className="mt-1 flex items-center gap-1 text-[12px] font-bold text-pink-700 hover:text-pink-800"
+                style={{ fontFamily: "'PixelAE', monospace" }}
               >
-                <ChevronDown
-                  size={14}
-                  className={"transition-transform " + (weekOpen ? "rotate-180" : "")}
-                />
-                <span>This week&apos;s activities</span>
+                <ChevronDown size={13} className={"transition-transform " + (weekOpen ? "rotate-180" : "")} />
+                This week
               </button>
               {weekOpen && (
-                <ul className="mt-2 space-y-1 text-[13px] text-emerald-900/80">
+                <ul className="mt-1 space-y-1 overflow-y-auto" style={{ maxHeight: 120 }}>
                   {weeklyItems.map((it, i) => (
-                    <li
-                      key={i}
-                      className="flex items-center justify-between gap-3 border-t border-emerald-200/60 py-1.5 first:border-t-0"
-                    >
-                      <span>{it.label}</span>
-                      <span className="shrink-0 text-emerald-700/70" style={{ fontFamily: FONT_MONO }}>
-                        {it.when}
-                      </span>
+                    <li key={i} className="flex items-center justify-between gap-2 border-t border-pink-200/70 py-1 first:border-0">
+                      <span className="text-[11px] text-stone-700" style={{ fontFamily: "'PixelAE', monospace" }}>{it.label}</span>
+                      <span className="shrink-0 text-[10px] text-pink-700/80" style={{ fontFamily: "'PixelAE', monospace" }}>{it.when}</span>
                     </li>
                   ))}
                 </ul>
@@ -388,37 +422,45 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Section nav — now below the welcome hero */}
-        <nav className="mb-6 flex gap-1 overflow-x-auto">
-          {navItems.map(({ label, icon: Icon }) => (
+        {/* ── nav row ───────────────────────────────────────── */}
+        <nav className="mb-5 flex gap-1 overflow-x-auto pb-1">
+          {navItems.map(({ label }) => (
             <button
               key={label}
               onClick={() => setActiveNav(label)}
               className={
-                "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-emerald-600 " +
+                "flex shrink-0 items-center gap-1 rounded px-2.5 py-1 text-[11px] font-bold transition-colors border " +
                 (activeNav === label
-                  ? "bg-emerald-700 text-white"
-                  : "text-stone-500 hover:bg-stone-100")
+                  ? "bg-[#b8dfc2] border-[#9fc7a9] text-[#5f725f]"
+                  : "border-pink-200/80 bg-[#fffafc] text-pink-700 hover:bg-pink-100")
               }
+              style={{ fontFamily: "'PixelAE', monospace" }}
             >
-              <Icon size={13} />
               {label}
             </button>
           ))}
         </nav>
 
-        {/* Card grid */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Card title="Daily To-Do" icon={<ListChecks size={16} className="text-white" />} accent="bg-emerald-600">
-            <Checklist items={todoItems} setItems={setTodoItems} doneColor="bg-emerald-600" />
+        {/* ── 3×3 card grid ─────────────────────────────────── */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" style={{ gridAutoRows: "minmax(220px, auto)" }}>
+
+          {/* 1. WEEKLY GOALS */}
+          <Card title="Weekly Goals" accentBg="bg-[#f5cfe2]">
+            <Checklist items={goals} setItems={setGoals} accentBg="bg-[#f5cfe2]" />
           </Card>
 
-          <Card title="Agenda" icon={<CalendarDays size={16} className="text-white" />} accent="bg-stone-500">
-            <ul className="space-y-2">
+          {/* 2. DAILY TO-DO */}
+          <Card title="Daily To-Do" accentBg="bg-[#cfead4]">
+            <Checklist items={todos} setItems={setTodos} accentBg="bg-[#cfead4]" />
+          </Card>
+
+          {/* 3. WEEKLY AGENDA */}
+          <Card title="Weekly Agenda" accentBg="bg-[#dcefdc]">
+            <ul className="space-y-1.5 overflow-y-auto" style={{ maxHeight: 160 }}>
               {agendaItems.map((it, i) => (
-                <li key={i} className="flex items-center justify-between gap-3 text-[13.5px] text-stone-700">
-                  <span>{it.label}</span>
-                  <span className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-500" style={{ fontFamily: FONT_MONO }}>
+                <li key={i} className="flex items-center justify-between gap-2 border-b border-stone-100 pb-1.5 last:border-0">
+                  <span className="text-[12px] text-stone-700" style={{ fontFamily: "'PixelAE', monospace" }}>{it.label}</span>
+                  <span className="shrink-0 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700" style={{ fontFamily: "'PixelAE', monospace" }}>
                     {it.when}
                   </span>
                 </li>
@@ -426,143 +468,145 @@ export default function HomePage() {
             </ul>
           </Card>
 
-          <Card title="Focus" icon={<Timer size={16} className="text-white" />} accent="bg-amber-600">
-            <div className="flex flex-col items-center py-1">
-              <div className="relative h-32 w-32">
-                <svg viewBox="0 0 120 120" className="h-32 w-32 -rotate-90">
-                  <circle cx="60" cy="60" r={radius} fill="none" stroke="#e7e5e4" strokeWidth="8" />
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r={radius}
-                    fill="none"
-                    stroke="#d97706"
-                    strokeWidth="8"
-                    strokeLinecap="round"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={dashoffset}
-                    style={{ transition: "stroke-dashoffset 1s linear" }}
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <img
-                    src={growthSprite}
-                    alt={`${sessionPalette} plant, stage ${growthStage}`}
-                    style={{ height: 30, width: "auto", imageRendering: "pixelated" }}
-                    className="mb-1 drop-shadow-sm"
-                  />
-                  <span className="text-lg font-semibold text-stone-800" style={{ fontFamily: FONT_MONO }}>
-                    {mm}:{ss}
-                  </span>
-                </div>
-              </div>
-              <div className="mt-3 flex items-center gap-2">
-                <button
-                  onClick={() => setRunning((r) => !r)}
-                  disabled={remaining === 0}
-                  className="flex items-center gap-1.5 rounded-full bg-amber-600 px-3.5 py-1.5 text-[12.5px] font-medium text-white hover:bg-amber-700 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                >
-                  {running ? <Pause size={13} /> : <Play size={13} />}
-                  {running ? "Pause" : remaining === 0 ? "Done" : "Start"}
-                </button>
-                <button
-                  onClick={() => {
-                    setRunning(false);
-                    setRemaining(TOTAL);
-                    setSessionPalette(TREE_PALETTES[Math.floor(Math.random() * TREE_PALETTES.length)]);
-                  }}
-                  aria-label="Reset timer"
-                  className="rounded-full border border-stone-200 p-1.5 text-stone-500 hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-400"
-                >
-                  <RotateCcw size={13} />
-                </button>
-              </div>
-            </div>
-          </Card>
-
-          <Card title="Grades" icon={<GraduationCap size={16} className="text-white" />} accent="bg-violet-600">
-            <div className="grid grid-cols-3 gap-1.5">
+          {/* 5. ACADEMICS */}
+          <Card title="Academics" accentBg="bg-[#f3d8e7]">
+            <div className="space-y-1.5 overflow-y-auto" style={{ maxHeight: 160 }}>
               {grades.map((g, i) => (
-                <div key={i} className="rounded-lg bg-stone-50 px-1.5 py-2 text-center">
-                  <p className="text-[9.5px] font-medium uppercase tracking-wide text-stone-400">{g.subj}</p>
-                  <p className="text-sm font-semibold text-stone-700">{g.grade}</p>
+                <div key={i} className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-stone-600" style={{ fontFamily: "'PixelAE', monospace" }}>{g.subj}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-20 overflow-hidden rounded-none border border-stone-300 bg-stone-100">
+                      <div className="h-full bg-purple-500" style={{ width: `${g.pct}%`, imageRendering: "pixelated" }} />
+                    </div>
+                    <span className="w-6 text-right text-[11px] font-bold text-stone-700" style={{ fontFamily: "'PixelAE', monospace" }}>{g.grade}</span>
+                  </div>
                 </div>
               ))}
-              <div className="rounded-lg bg-violet-600 px-1.5 py-2 text-center">
-                <p className="text-[9.5px] font-medium uppercase tracking-wide text-violet-200">Average</p>
-                <p className="text-sm font-semibold text-white">B+</p>
+              <div className="mt-1 flex items-center justify-between border-t-2 border-purple-200 pt-1">
+                <span className="text-[11px] font-bold text-stone-700" style={{ fontFamily: "'PixelAE', monospace" }}>AVERAGE</span>
+                <span className="text-[13px] font-bold text-purple-700" style={{ fontFamily: "'PixelAE', monospace" }}>B+</span>
               </div>
             </div>
           </Card>
 
-          <Card title="Budget" icon={<Wallet size={16} className="text-white" />} accent="bg-rose-600">
-            <p className="text-[11px] text-stone-400">{budget.periodLabel}</p>
+          {/* 6. RESOURCES */}
+          <Card title="Resources" accentBg="bg-[#d8efe0]">
+            <div className="space-y-1.5">
+              {["Courses","Wellness","Murphy"].map(cat => (
+                <div key={cat}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-0.5" style={{ fontFamily: "'PixelAE', monospace" }}>
+                    {cat}
+                  </p>
+                  {resources.filter(r => r.cat === cat).map((r, i) => (
+                    <a
+                      key={i} href={r.url}
+                      className="flex items-center gap-1 rounded px-1 py-0.5 text-[12px] text-teal-700 hover:bg-teal-50 hover:underline"
+                      style={{ fontFamily: "'PixelAE', monospace" }}
+                      target="_blank" rel="noreferrer"
+                    >
+                      <ExternalLink size={10} className="shrink-0" />
+                      {r.label}
+                    </a>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </Card>
 
+          {/* 7. OPPORTUNITIES / REJECTION TRACKER */}
+          <Card title="Opportunities" accentBg="bg-[#f2dce8]">
+            <div className="flex items-start gap-3">
+              <PieChart accepted={accepted} rejected={rejected} pending={pending} />
+              <div className="flex flex-col gap-1 text-[11px] text-stone-600" style={{ fontFamily: "'PixelAE', monospace" }}>
+                <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 bg-[#bcdcc2] border border-stone-200" /> {accepted} accepted</span>
+                <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 bg-[#e9bebe] border border-stone-200" /> {rejected} rejected</span>
+                <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 bg-[#e9d8a6] border border-stone-200" /> {pending} pending</span>
+                <div className="mt-2 border-t border-stone-200 pt-1">
+                  <p className="text-stone-500">Goal: {goalAcceptances} acceptances</p>
+                  <p className="font-bold text-[#a7868b]">{Math.max(0, goalAcceptances - accepted)} more to go</p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-2 space-y-0.5 overflow-y-auto" style={{ maxHeight: 60 }}>
+              {apps.map((a, i) => (
+                <div key={i} className="flex items-center justify-between text-[10px]" style={{ fontFamily: "'PixelAE', monospace" }}>
+                  <span className="text-stone-600">{a.name}</span>
+                  <span className={
+                    "font-bold " +
+                    (a.status === "accepted" ? "text-green-600" : a.status === "rejected" ? "text-red-500" : "text-yellow-600")
+                  }>
+                    {a.status.toUpperCase()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* 8. BUDGET */}
+          <Card title="Budget" accentBg="bg-[#dbeedb]">
+            <p className="text-[10px] text-stone-400" style={{ fontFamily: "'PixelAE', monospace" }}>{budget.periodLabel}</p>
             {overBudget ? (
-              <div className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-rose-50 px-2.5 py-1.5 text-rose-700">
-                <AlertTriangle size={14} className="shrink-0" />
-                <span className="text-[13px] font-medium">
-                  Over budget by{" "}
-                  <span style={{ fontFamily: FONT_MONO }}>${Math.abs(spendable).toFixed(2)}</span>
+              <div className="mt-1 flex items-center gap-1.5 rounded border-2 border-red-300 bg-rose-50 px-2 py-1 text-rose-700">
+                <AlertTriangle size={12} className="shrink-0" />
+                <span className="text-[11px] font-bold" style={{ fontFamily: "'PixelAE', monospace" }}>
+                  OVER by ${Math.abs(spendable).toFixed(2)}
                 </span>
               </div>
             ) : (
-              <div className="mt-1.5 flex items-baseline gap-1.5">
-                <span className="text-2xl font-semibold text-stone-800" style={{ fontFamily: FONT_MONO }}>
-                  ${spendable.toFixed(2)}
-                </span>
-                <span className="text-[12px] text-stone-400">left to spend</span>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-xl font-bold text-stone-800" style={{ fontFamily: "'PixelAE', monospace" }}>${spendable.toFixed(2)}</span>
+                <span className="text-[10px] text-stone-400" style={{ fontFamily: "'PixelAE', monospace" }}>left</span>
               </div>
             )}
-
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
+            <div className="mt-1.5 h-2 w-full border-2 border-stone-300 bg-stone-100">
               <div
-                className={"h-full rounded-full " + (overBudget ? "bg-rose-600" : "bg-rose-500")}
+                className={"h-full " + (overBudget ? "bg-rose-600" : "bg-rose-400")}
                 style={{ width: `${Math.min(100, (budget.spent / budget.allowance) * 100)}%` }}
               />
             </div>
-            <p className="mt-2 text-[12.5px] text-stone-500">
-              <span className="font-medium text-stone-700" style={{ fontFamily: FONT_MONO }}>
-                ${budget.saved.toFixed(2)}
-              </span>{" "}
-              saved overall
+            <p className="mt-1 text-[11px] text-stone-500" style={{ fontFamily: "'PixelAE', monospace" }}>
+              <span className="font-bold text-stone-700">${budget.saved.toFixed(2)}</span> saved
             </p>
-
-            <p className="mt-3 text-[10.5px] font-medium uppercase tracking-wide text-stone-400">
-              Recent expenses
+            <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-stone-400" style={{ fontFamily: "'PixelAE', monospace" }}>
+              Recent
             </p>
-            <ul className="mt-1 space-y-1">
+            <ul className="mt-0.5 space-y-0.5">
               {expenses.map((e, i) => (
-                <li key={i} className="flex items-center justify-between text-[12.5px] text-stone-600">
-                  <span>{e.label}</span>
-                  <span style={{ fontFamily: FONT_MONO }}>-${e.amount.toFixed(2)}</span>
+                <li key={i} className="flex justify-between text-[11px] text-stone-600" style={{ fontFamily: "'PixelAE', monospace" }}>
+                  <span>{e.label}</span><span>-${e.amount.toFixed(2)}</span>
                 </li>
               ))}
             </ul>
           </Card>
 
-          <Card title="Self Care" icon={<Smile size={16} className="text-white" />} accent="bg-pink-500">
-            <div className="flex items-center justify-between">
-              {moods.map(({ Icon, label }, i) => (
+          {/* 9. SELF CARE */}
+          <Card title="Self Care" accentBg="bg-[#f4cfe1]">
+            {/* mood row */}
+            <div className="flex items-center justify-between mb-2">
+              {MOODS.map(({ src, label }, i) => (
                 <button
                   key={label}
                   onClick={() => setSelectedMood(i)}
                   aria-label={label}
                   className={
-                    "flex h-9 w-9 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-500 " +
-                    (selectedMood === i
-                      ? "bg-pink-500 text-white"
-                      : "text-stone-400 hover:bg-stone-100 hover:text-stone-600")
+                    "flex flex-col items-center gap-0.5 rounded p-1 transition-colors " +
+                    (selectedMood === i ? "bg-pink-100 ring-2 ring-pink-400" : "hover:bg-stone-100")
                   }
                 >
-                  <Icon size={18} />
+                  <Image
+                    src={src} alt={label}
+                    width={22} height={22}
+                    style={{ imageRendering: "pixelated" }}
+                  />
                 </button>
               ))}
             </div>
-            <p className="mb-2 mt-1 text-center text-[11px] text-stone-400">{moods[selectedMood].label}</p>
-            <Checklist items={selfCareItems} setItems={setSelfCareItems} doneColor="bg-pink-500" />
-
+            <p className="mb-2 text-center text-[10px] font-bold text-pink-600" style={{ fontFamily: "'PixelAE', monospace" }}>
+              {MOODS[selectedMood].label}
+            </p>
+            <Checklist items={selfCare} setItems={setSelfCare} accentBg="bg-pink-500" />
           </Card>
+
         </div>
       </main>
     </div>
