@@ -9,14 +9,7 @@ import {
   ChevronDown,
   AlertTriangle,
   ExternalLink,
-  X,
-  Home,
-  CreditCard,
-  BookOpen,
-  GraduationCap,
-  Briefcase,
-  User,
-  FolderOpen,
+  X
 } from "lucide-react";
 
 /* ─── pixel emoji paths ───────────────────────────────────────── */
@@ -262,7 +255,29 @@ export default function HomePage() {
     hour: "numeric", minute: "2-digit",
   });
   const weekNum  = getWeekNumber(now);
-  const tempC    = 22;
+  const [temperature, setTemperature] = useState(null);
+  useEffect(() => {
+    async function loadWeather() {
+      try {
+        const res = await fetch(
+          "https://api.open-meteo.com/v1/forecast?latitude=-25.9655&longitude=32.5832&current=temperature_2m&timezone=auto&forecast_days=1"
+        );
+
+        const data = await res.json();
+
+        if (data?.current?.temperature_2m === undefined) {
+          console.log("Unexpected weather response:", data);
+          return;
+        }
+
+        setTemperature(data.current.temperature_2m);
+      } catch (error) {
+        console.error("Could not load weather:", error);
+      }
+    }
+
+    loadWeather();
+}, []);
 
   /* nav */
   const navItems = [
@@ -421,7 +436,7 @@ export default function HomePage() {
             className="text-right text-[12px] font-bold text-pink-700"
             style={{ fontFamily: "'PixelAE', monospace" }}
           >
-            {timeStr} · {tempC}°C
+            {timeStr} · {temperature === null ? "--" : Math.round(temperature)}°C
           </p>
         </div>
       </header>
