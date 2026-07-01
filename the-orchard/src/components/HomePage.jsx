@@ -4,15 +4,7 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import {
   Menu,
-  Home as HomeIcon,
-  CalendarDays,
-  Calendar,
-  GraduationCap,
-  Target,
-  Briefcase,
-  Wallet,
-  Heart,
-  Layers,
+  Home as
   Plus,
   Check,
   ChevronDown,
@@ -82,7 +74,7 @@ function PieChart({ accepted, rejected, pending }) {
 }
 
 /* ─── shared card shell ───────────────────────────────────────── */
-function Card({ title, accentBg, children, className = "" }) {
+function Card({ title, children, className = "" }) {
   return (
     <div
       className={"relative overflow-hidden rounded-2xl border border-pink-200/70 shadow-[0_2px_8px_rgba(244,194,214,0.18)] " + className}
