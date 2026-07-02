@@ -143,15 +143,15 @@ function Card({ title, children, className = "" }) {
 /* ─── side menu with card styling ───────────────────────────────── */
 function SideMenu({ isOpen, onClose }) {
   const menuItems = [
-    { label: "Home" },
-    { label: "Calendar" },
-    { label: "Agenda" },
-    { label: "Academics" },
-    { label: "Goals" },
-    { label: "Opportunities" },
-    { label: "Budget" },
-    { label: "Self Care" },
-    { label: "Resources" },
+    { label: "Home", href: "/" },
+    { label: "Calendar", href: "/calendar" },
+    { label: "Agenda", href: "/agenda" },
+    { label: "Academics", href: "/academics" },
+    { label: "Goals", href: "/goals" },
+    { label: "Opportunities", href: "/opportunities" },
+    { label: "Budget", href: "/budget" },
+    { label: "Self Care", href: "/self-care" },
+    { label: "Resources", href: "/resources" },
   ];
 
   return (
@@ -199,13 +199,14 @@ function SideMenu({ isOpen, onClose }) {
           {/* Menu Items */}
           <nav className="flex flex-col gap-1 flex-1 overflow-y-auto">
             {menuItems.map((item, index) => (
-              <button
+              <a
                 key={index}
+                href={item.href}
                 className="rounded px-3 py-2.5 text-left text-[12px] font-bold text-stone-700 hover:bg-[#d7a06f]/40 transition-colors"
                 style={{ fontFamily: "'PixelAE', monospace" }}
               >
                 {item.label}
-              </button>
+              </a>
             ))}
           </nav>
         </div>
@@ -340,15 +341,15 @@ export default function HomePage() {
 
   /* nav */
   const navItems = [
-    { label: "Home" },
-    { label: "Calendar" },
-    { label: "Agenda" },
-    { label: "Academics" },
-    { label: "Goals" },
-    { label: "Opportunities" },
-    { label: "Budget" },
-    { label: "Self Care" },
-    { label: "Resources" },
+    { label: "Home", href: "/" },
+    { label: "Calendar", href: "/calendar" },
+    { label: "Agenda", href: "/agenda" },
+    { label: "Academics", href: "/academics" },
+    { label: "Goals", href: "/goals" },
+    { label: "Opportunities", href: "/opportunities" },
+    { label: "Budget", href: "/budget" },
+    { label: "Self Care", href: "/self-care" },
+    { label: "Resources", href: "/resources" },
   ];
   const [activeNav, setActiveNav] = useState("Home");
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
@@ -647,10 +648,10 @@ export default function HomePage() {
 
         {/* ── nav row ───────────────────────────────────────── */}
         <nav className="mb-5 flex gap-1 overflow-x-auto pb-1">
-          {navItems.map(({ label }) => (
-            <button
+          {navItems.map(({ label, href }) => (
+            <a
               key={label}
-              onClick={() => setActiveNav(label)}
+              href={href}
               className={
                 "flex shrink-0 items-center gap-1 rounded px-2.5 py-1 text-[11px] font-bold transition-colors border " +
                 (activeNav === label
@@ -660,7 +661,7 @@ export default function HomePage() {
               style={{ fontFamily: "'PixelAE', monospace" }}
             >
               {label}
-            </button>
+            </a>
           ))}
         </nav>
 

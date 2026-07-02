@@ -138,3 +138,79 @@ export async function GET() {
     );
   }
 }
+
+export async function POST(request: Request) {
+  try {
+    const session = await auth();
+    const accessToken = session?.accessToken;
+
+    if (!accessToken) {
+      return NextResponse.json(
+        {
+          error: "Not authenticated",
+          message: "No Google access token found. Please sign in first.",
+        },
+        { status: 401 }
+      );
+    }
+
+    const eventData = await request.json();
+    console.log("API received event data:", eventData);
+
+    // Use the primary calendar for adding events
+    const calendarId = "primary";
+
+    const eventUrl = new URL(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`
+    );
+
+    const googleEvent = {
+      summary: eventData.summary,
+      start: eventData.start,
+      end: eventData.end,
+      location: eventData.location || "",
+      description: eventData.description || "",
+    };
+
+    console.log("Sending to Google Calendar:", JSON.stringify(googleEvent, null, 2));
+
+    const eventRes = await fetch(eventUrl.toString(), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(googleEvent),
+      cache: "no-store",
+    });
+
+    const eventDataResponse = await eventRes.json();
+
+    if (!eventRes.ok) {
+      console.error("Failed to create event:", eventDataResponse);
+      return NextResponse.json(
+        {
+          error: "Failed to create event",
+          details: eventDataResponse,
+        },
+        { status: eventRes.status }
+      );
+    }
+
+    console.log("Event created successfully:", eventDataResponse);
+
+    return NextResponse.json({
+      event: eventDataResponse,
+      message: "Event created successfully",
+    });
+  } catch (error) {
+    console.error("Calendar API POST - Error:", error);
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    );
+  }
+}
