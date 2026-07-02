@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
+import { useSession, signIn, signOut } from "next-auth/react";
 import {
   Menu,
   Plus,
@@ -246,6 +247,7 @@ function Checklist({ items, setItems, accentBg, limit = 6 }) {
 
 /* ══════════════════════════════════════════════════════════════ */
 export default function HomePage() {
+  const { data: session, status } = useSession();
   const now = useClock();
 
   const dayDate = now.toLocaleDateString(undefined, {
@@ -256,6 +258,8 @@ export default function HomePage() {
   });
   const weekNum  = getWeekNumber(now);
   const [temperature, setTemperature] = useState(null);
+  const [calendarEvents, setCalendarEvents] = useState([]);
+
   useEffect(() => {
     async function loadWeather() {
       try {
@@ -277,7 +281,25 @@ export default function HomePage() {
     }
 
     loadWeather();
-}, []);
+  }, []);
+
+  useEffect(() => {
+    async function loadCalendarEvents() {
+      if (status === "authenticated") {
+        try {
+          const res = await fetch("/api/calendar/events");
+          if (res.ok) {
+            const data = await res.json();
+            setCalendarEvents(data.events || []);
+          }
+        } catch (error) {
+          console.error("Could not load calendar events:", error);
+        }
+      }
+    }
+
+    loadCalendarEvents();
+  }, [status]);
 
   /* nav */
   const navItems = [
@@ -390,14 +412,19 @@ export default function HomePage() {
     { label: "Library",  url: "#",                                cat: "Murphy"   },
   ];
 
-  /* weekly agenda */
-  const agendaItems = [
-    { label: "Bio 201 lab report",   when: "Fri" },
-    { label: "Project proposal",     when: "Mon" },
-    { label: "Dentist · 2:00 PM",   when: "Thu" },
-    { label: "History essay due",    when: "Fri" },
-    { label: "SPAN vocab quiz",      when: "Wed" },
-  ];
+  /* weekly agenda - use calendar events if authenticated, otherwise fallback */
+  const agendaItems = calendarEvents.length > 0
+    ? calendarEvents.map(event => ({
+        label: event.summary || "No title",
+        when: event.start?.date || new Date(event.start?.dateTime).toLocaleDateString(undefined, { weekday: 'short' }),
+      }))
+    : [
+        { label: "Bio 201 lab report",   when: "Fri" },
+        { label: "Project proposal",     when: "Mon" },
+        { label: "Dentist · 2:00 PM",   when: "Thu" },
+        { label: "History essay due",    when: "Fri" },
+        { label: "SPAN vocab quiz",      when: "Wed" },
+      ];
 
   /* ══════════════════════════════════════════════════════════════ */
   return (
@@ -435,6 +462,23 @@ export default function HomePage() {
             >
               THE ORCHARD
             </span>
+            {status === "authenticated" ? (
+              <button
+                onClick={() => signOut()}
+                className="ml-2 rounded px-2 py-1 text-[10px] font-bold text-pink-700 border border-pink-300 hover:bg-pink-100"
+                style={{ fontFamily: "'PixelAE', monospace" }}
+              >
+                Sign Out
+              </button>
+            ) : (
+              <button
+                onClick={() => signIn("google")}
+                className="ml-2 rounded px-2 py-1 text-[10px] font-bold text-pink-700 border border-pink-300 hover:bg-pink-100"
+                style={{ fontFamily: "'PixelAE', monospace" }}
+              >
+                Sign In
+              </button>
+            )}
           </div>
           <p
             className="flex-1 text-center text-[12px] text-pink-600"
