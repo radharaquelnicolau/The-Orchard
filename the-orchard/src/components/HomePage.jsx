@@ -343,18 +343,36 @@ export default function HomePage() {
   const [activeNav, setActiveNav] = useState("Home");
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
 
-  /* welcome data */
+  /* calculate week bounds and filter events for current week */
+  const { weekStart, weekEnd } = getWeekBounds(now);
+  const weeklyCalendarEvents = status === "authenticated"
+    ? calendarEvents.filter(event => isEventInWeek(event, weekStart, weekEnd))
+    : [];
+
+  /* welcome data - use calendar events when authenticated */
   const assignmentsDue = 2;
-  const eventsCount    = 2;
-  const overdueCount   = 1;
+  const eventsCount = status === "authenticated" ? weeklyCalendarEvents.length : 2;
+  const overdueCount = status === "authenticated"
+    ? calendarEvents.filter(event => {
+        const start = getEventStartDate(event);
+        return start !== null && start < now;
+      }).length
+    : 1;
   const [weekOpen, setWeekOpen] = useState(true);
-  const weeklyItems = [
-    { label: "Calculus assignment", when: "30/06 · 13:00" },
-    { label: "History Essay",       when: "31/06 · 00:00" },
-    { label: "Scholarship Essay",   when: "31/06 · 00:00" },
-    { label: "Meeting w/ Coordinator", when: "31/06 · 14:00" },
-    { label: "Stacy's bday",        when: "· 14:00"        },
-  ];
+  const weeklyItems = status === "authenticated"
+    ? weeklyCalendarEvents.map(event => ({
+        label: event.summary || "No title",
+        when: event.start?.date
+          ? new Date(event.start.date + "T00:00:00").toLocaleDateString(undefined, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })
+          : new Date(event.start?.dateTime).toLocaleDateString(undefined, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      }))
+    : [
+        { label: "Calculus assignment", when: "30/06 · 13:00" },
+        { label: "History Essay",       when: "31/06 · 00:00" },
+        { label: "Scholarship Essay",   when: "31/06 · 00:00" },
+        { label: "Meeting w/ Coordinator", when: "31/06 · 14:00" },
+        { label: "Stacy's bday",        when: "· 14:00"        },
+      ];
 
   /* daily verse */
 /* daily verse — fetched from YouVersion API */
@@ -440,12 +458,6 @@ export default function HomePage() {
   ];
 
   /* weekly agenda - use calendar events if authenticated, otherwise fallback */
-  const { weekStart, weekEnd } = getWeekBounds(now);
-
-  const weeklyCalendarEvents = status === "authenticated"
-    ? calendarEvents.filter(event => isEventInWeek(event, weekStart, weekEnd))
-    : [];
-
   const agendaItems = status === "authenticated"
     ? weeklyCalendarEvents.map(event => ({
         label: event.summary || "No title",
