@@ -308,10 +308,20 @@ export default function HomePage() {
   ];
 
   /* daily verse */
-  const verse = {
+/* daily verse — fetched from YouVersion API */
+  const [verse, setVerse] = useState({
     text: "Be joyful in hope, patient in affliction, faithful in prayer.",
-    ref:  "Romans 12:12",
-  };
+    ref: "Romans 12:12",
+  });
+
+  useEffect(() => {
+    fetch("/api/verse")
+      .then(r => r.json())
+      .then(data => {
+        if (data.text) setVerse({ text: data.text, ref: data.reference });
+      })
+      .catch(); // change this
+  }, []);
 
   /* ── card state ─────────────────────────────────── */
 
