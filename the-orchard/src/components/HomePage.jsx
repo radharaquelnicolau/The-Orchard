@@ -65,6 +65,15 @@ function isEventInWeek(event, weekStart, weekEnd) {
   return start !== null && start >= weekStart && start < weekEnd;
 }
 
+function getEventSortValue(event) {
+  const start = getEventStartDate(event);
+  return start ? start.getTime() : Number.MAX_SAFE_INTEGER;
+}
+
+function sortEventsChronologically(events) {
+  return [...events].sort((a, b) => getEventSortValue(a) - getEventSortValue(b));
+}
+
 /* ─── tiny pie chart (SVG) for rejection tracker ─────────────── */
 function PieChart({ accepted, rejected, pending }) {
   const total = accepted + rejected + pending || 1;
@@ -312,7 +321,8 @@ export default function HomePage() {
           const res = await fetch("/api/calendar/events");
           if (res.ok) {
             const data = await res.json();
-            setCalendarEvents(data.events || []);
+            const fetchedEvents = data.events || [];
+            setCalendarEvents(sortEventsChronologically(fetchedEvents));
           }
         } catch (error) {
           console.error("Could not load calendar events:", error);
@@ -346,7 +356,9 @@ export default function HomePage() {
   /* calculate week bounds and filter events for current week */
   const { weekStart, weekEnd } = getWeekBounds(now);
   const weeklyCalendarEvents = status === "authenticated"
-    ? calendarEvents.filter(event => isEventInWeek(event, weekStart, weekEnd))
+    ? sortEventsChronologically(
+        calendarEvents.filter(event => isEventInWeek(event, weekStart, weekEnd))
+      )
     : [];
 
   /* welcome data - use calendar events when authenticated */
