@@ -45,6 +45,26 @@ function getWeekNumber(date) {
   return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 
+function getWeekBounds(date) {
+  const weekStart = new Date(date);
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  return { weekStart, weekEnd };
+}
+
+function getEventStartDate(event) {
+  if (event.start?.date) return new Date(event.start.date + "T00:00:00");
+  if (event.start?.dateTime) return new Date(event.start.dateTime);
+  return null;
+}
+
+function isEventInWeek(event, weekStart, weekEnd) {
+  const start = getEventStartDate(event);
+  return start !== null && start >= weekStart && start < weekEnd;
+}
+
 /* ─── tiny pie chart (SVG) for rejection tracker ─────────────── */
 function PieChart({ accepted, rejected, pending }) {
   const total = accepted + rejected + pending || 1;
@@ -259,6 +279,7 @@ export default function HomePage() {
   const weekNum  = getWeekNumber(now);
   const [temperature, setTemperature] = useState(null);
   const [calendarEvents, setCalendarEvents] = useState([]);
+  const [calendarLoaded, setCalendarLoaded] = useState(false);
 
   useEffect(() => {
     async function loadWeather() {
@@ -286,6 +307,7 @@ export default function HomePage() {
   useEffect(() => {
     async function loadCalendarEvents() {
       if (status === "authenticated") {
+        setCalendarLoaded(false);
         try {
           const res = await fetch("/api/calendar/events");
           if (res.ok) {
@@ -294,7 +316,12 @@ export default function HomePage() {
           }
         } catch (error) {
           console.error("Could not load calendar events:", error);
+        } finally {
+          setCalendarLoaded(true);
         }
+      } else {
+        setCalendarEvents([]);
+        setCalendarLoaded(false);
       }
     }
 
@@ -413,10 +440,18 @@ export default function HomePage() {
   ];
 
   /* weekly agenda - use calendar events if authenticated, otherwise fallback */
-  const agendaItems = calendarEvents.length > 0
-    ? calendarEvents.map(event => ({
+  const { weekStart, weekEnd } = getWeekBounds(now);
+
+  const weeklyCalendarEvents = status === "authenticated"
+    ? calendarEvents.filter(event => isEventInWeek(event, weekStart, weekEnd))
+    : [];
+
+  const agendaItems = status === "authenticated"
+    ? weeklyCalendarEvents.map(event => ({
         label: event.summary || "No title",
-        when: event.start?.date || new Date(event.start?.dateTime).toLocaleDateString(undefined, { weekday: 'short' }),
+        when: event.start?.date
+          ? new Date(event.start.date + "T00:00:00").toLocaleDateString(undefined, { weekday: "short" })
+          : new Date(event.start?.dateTime).toLocaleDateString(undefined, { weekday: "short" }),
       }))
     : [
         { label: "Bio 201 lab report",   when: "Fri" },
@@ -621,14 +656,20 @@ export default function HomePage() {
           {/* 3. WEEKLY AGENDA */}
           <Card title="Weekly Agenda" accentBg="bg-[#dcefdc]">
             <ul className="space-y-1.5 overflow-y-auto" style={{ maxHeight: 160 }}>
-              {agendaItems.map((it, i) => (
-                <li key={i} className="flex items-center justify-between gap-2 border-b border-stone-100 pb-1.5 last:border-0">
-                  <span className="text-[12px] text-stone-700" style={{ fontFamily: "'PixelAE', monospace" }}>{it.label}</span>
-                  <span className="shrink-0 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700" style={{ fontFamily: "'PixelAE', monospace" }}>
-                    {it.when}
-                  </span>
+              {status === "authenticated" && calendarLoaded && agendaItems.length === 0 ? (
+                <li className="text-[12px] text-stone-500" style={{ fontFamily: "'PixelAE', monospace" }}>
+                  No events for this week
                 </li>
-              ))}
+              ) : (
+                agendaItems.map((it, i) => (
+                  <li key={i} className="flex items-center justify-between gap-2 border-b border-stone-100 pb-1.5 last:border-0">
+                    <span className="text-[12px] text-stone-700" style={{ fontFamily: "'PixelAE', monospace" }}>{it.label}</span>
+                    <span className="shrink-0 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700" style={{ fontFamily: "'PixelAE', monospace" }}>
+                      {it.when}
+                    </span>
+                  </li>
+                ))
+              )}
             </ul>
           </Card>
 
